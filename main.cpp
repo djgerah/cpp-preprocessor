@@ -47,8 +47,10 @@ bool Preprocess(const std::filesystem::path& in_file, const std::filesystem::pat
     std::smatch m;
     std::string text;
     size_t line = 0;
-    std::ifstream in(in_file);
-    std::ofstream out(out_file, std::ios::out | std::ios::app);
+    std::ifstream in;
+    if(!in.is_open()) in.open(in_file);
+    std::ofstream out;
+    if(!out.is_open()) out.open(out_file, std::ios::out | std::ios::app);
 
     while (getline(in, text))
     {
