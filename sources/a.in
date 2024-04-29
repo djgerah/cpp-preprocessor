@@ -1,0 +1,13 @@
+// this comment before include
+// text from b.h before include
+// text from c.h before include
+// std1
+// text from c.h after include
+// text from b.h after include
+// text between b.h and c.h
+// text from d.h before include
+// std2
+// text from d.h after include
+
+int SayHello() {
+    cout << "hello, world!" << endl;
