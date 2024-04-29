@@ -5,123 +5,125 @@
 #include <regex>
 #include <sstream>
 #include <string>
-#include <string_view>
 #include <vector>
 
-using namespace std;
-using filesystem::path;
+// using namespace std;
+// using filesystem::path;
+using namespace std::string_literals;
 
-path operator""_p(const char* data, std::size_t sz) 
+std::filesystem::path operator""_p(const char* data, std::size_t sz)
 {
-    return path(data, data + sz);
+    return std::filesystem::path(data, data + sz);
 }
 
-// напишите эту функцию
-bool Preprocess(const path& in_file, const path& out_file, const vector<path>& include_directories) {
-    static regex include_file /* #include "..." */ (R"/(\s*#\s*include\s*"([^ "]*)"\s*)/");
-    static regex include_lib /* #include <...> */ (R"/(\s*#\s*include\s*<([^>]*)>\s*)/");
-    smatch m;
-    string text;
-    size_t line = 0;
-    ifstream in(in_file);
-    ofstream out(out_file, ios::out | ios::app);
+bool Preprocess(const std::filesystem::path& in_file, const std::filesystem::path& out_file, const std::vector<std::filesystem::path>& include_directories);
 
-    while (getline(in, text)) 
+bool RecursivePreprocess(const std::filesystem::path& in_file, const std::filesystem::path& out_file, std::filesystem::path file, size_t line, const std::vector<std::filesystem::path>& include_directories)
+{
+    bool found = false;
+    // Если файл не найден, поиск выполняется последовательно по всем элементам вектора include_directories
+    for (const auto& path : include_directories)
     {
-        ++line;
-        if (regex_match(text, m, include_file)) 
+        if (exists(std::filesystem::path(path / file)))
         {
-            path p = string(m[1]);
-            // Получите папку текущего файла через метод parent_path
-            path path = in_file.parent_path() / p;
-            // Полезно использовать метод is_open класса ifstream, чтобы проверить, был ли открыт файл. 
-            ifstream ifstr;
-            ifstr.open(path);
-
-            if (ifstr.is_open())
-            {
-                /* Рекурсивная функция (поток ввода, поток вывода, 
-                имя файла, к которому относится поток ввода, чтобы в случае чего выдать ошибку,
-                вектор include-директорий) */
-                Preprocess(path, out_file, include_directories);
-                ifstr.close();
-            }
-
-            else 
-            {
-            bool found = false;
-            // Если файл не найден, поиск выполняется последовательно по всем элементам вектора include_directories
-            for (const auto& file : include_directories) 
-            {
-                using filesystem::path;
-                if (exists(path(file / p))) 
-                {
-                    found = true;
-
-                    Preprocess(file / p, out_file, include_directories);
-                    break;
-                }
-            }
-
-            if (!found) 
-            {
-                /* Если включаемый файл так и не был найден или его не удалось открыть через ifstream, функция должна вывести в cout следующий текст: */
-                cout << "unknown include file "s << p.filename().string() << " at file "s << in_file.string() << " at line "s << line << endl;
-            return found;
-            }
-            }
-        }
-
-        else if (regex_match(text, m, include_lib)) 
-        {
-            path p = string(m[1]);
-
-            bool found = false;
-            // Если файл не найден, поиск выполняется последовательно по всем элементам вектора include_directories
-            for (const auto& file : include_directories) 
-            {
-                if (exists(path(file / p))) 
-                {
-                    found = true;
-
-                    Preprocess(file / p, out_file, include_directories);
-                    break;
-                }
-            }
-
-            if (!found) 
-            {
-                /* Если включаемый файл так и не был найден или его не удалось открыть через ifstream, функция должна вывести в cout следующий текст: */
-                cout << "unknown include file "s << p.filename().string() << " at file "s << in_file.string() << " at line "s << line << endl;
-            return found;
-            }
-            
-        }
-
-        else 
-        {
-            out << text << endl;
+            found = true;
+            Preprocess(path / file, out_file, include_directories);
         }
     }
-    
+
+    if (!found)
+    {
+        // Если включаемый файл так и не был найден или его не удалось открыть через ifstream, 
+        // функция должна вывести в cout следующий текст:
+        std::cout << "unknown include file "s << file.filename().string() << " at file "s << in_file.string() << " at line "s << line << std::endl;
+    }
+    return found;
+}
+
+bool Preprocess(const std::filesystem::path& in_file, const std::filesystem::path& out_file, const std::vector<std::filesystem::path>& include_directories)
+{
+    static std::regex include_file (R"/(\s*#\s*include\s*"([^ "]*)"\s*)/"); // #include "..."
+    static std::regex include_lib (R"/(\s*#\s*include\s*<([^>]*)>\s*)/"); // #include <...>
+    std::smatch m;
+    std::string text;
+    size_t line = 0;
+    std::ifstream in(in_file);
+    std::ofstream out(out_file, std::ios::out | std::ios::app);
+
+    while (getline(in, text))
+    {
+        ++line;
+        if (regex_match(text, m, include_file))
+        {
+            std::filesystem::path name_file = std::string(m[1]);
+            // Получите папку текущего файла через метод parent_path
+            std::filesystem::path path = in_file.parent_path() / name_file;
+            // Полезно использовать метод is_open класса ifstream, чтобы проверить, был ли открыт файл. 
+            std::ifstream file;
+            file.open(path);
+
+            if (file.is_open())
+            {
+                Preprocess(path, out_file, include_directories);
+                file.close();
+            }
+
+            else
+            {
+                /* Рекурсивная функция (поток ввода, поток вывода,
+                имя файла, к которому относится поток ввода, чтобы в случае чего выдать ошибку, номер строки,
+                вектор include-директорий) */
+                bool found = RecursivePreprocess(in_file, out_file, name_file, line, include_directories);
+                
+                if (!found)
+                {
+                    return false;
+                }
+            }
+        }
+
+        else if (regex_match(text, m, include_lib))
+        {
+            std::filesystem::path name_file = std::string(m[1]);
+
+            /* Рекурсивная функция (поток ввода, поток вывода,
+            имя файла, к которому относится поток ввода, чтобы в случае чего выдать ошибку,
+            вектор include-директорий) */
+            bool found = RecursivePreprocess(in_file, out_file, name_file, line, include_directories);
+            
+            if (!found)
+            {
+                return false;
+            }
+
+        }
+
+        else
+        {
+            out << text << std::endl;
+        }
+    }
+
     return true;
 }
 
-string GetFileContents(string file) 
+std::string GetFileContents(std::string file)
 {
-    ifstream stream(file);
+    std::ifstream stream(file);
 
     // конструируем string по двум итераторам
-    return { (istreambuf_iterator<char>(stream)), istreambuf_iterator<char>() };
+    return { (std::istreambuf_iterator<char>(stream)), std::istreambuf_iterator<char>() };
 }
 
-void Test() 
+void Test()
 {
-    error_code err;
-    filesystem::remove_all("sources"_p, err);
-    filesystem::create_directories("sources"_p / "include2"_p / "lib"_p, err);
-    filesystem::create_directories("sources"_p / "include1"_p, err);
-    filesystem::create_directories("sources"_p / "dir1"_p / "subdir"_p, err);
+    using namespace std;
+    
+    std::error_code err;
+    std::filesystem::remove_all("sources"_p, err);
+    std::filesystem::create_directories("sources"_p / "include2"_p / "lib"_p, err);
+    std::filesystem::create_directories("sources"_p / "include1"_p, err);
+    std::filesystem::create_directories("sources"_p / "dir1"_p / "subdir"_p, err);
 
     {
         ofstream file("sources/a.cpp");
@@ -183,7 +185,9 @@ void Test()
     assert(GetFileContents("sources/a.in"s) == test_out.str());
 }
 
-int main() 
+int main()
 {
     Test();
+
+    return 0;
 }
