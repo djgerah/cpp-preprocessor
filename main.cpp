@@ -87,7 +87,7 @@ bool Preprocess(const std::filesystem::path& in_file, const std::filesystem::pat
             std::filesystem::path name_file = std::string(m[1]);
 
             /* Рекурсивная функция (поток ввода, поток вывода,
-            имя файла, к которому относится поток ввода, чтобы в случае чего выдать ошибку,
+            имя файла, к которому относится поток ввода, чтобы в случае чего выдать ошибку, номер строки,
             вектор include-директорий) */
             bool found = RecursivePreprocess(in_file, out_file, name_file, line, include_directories);
             
